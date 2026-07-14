@@ -1,26 +1,194 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #f3f3f6;
+  --foreground: #000000;
+  --snap-yellow: #fffc00;
+  --snap-dark: #ffffff;      /* flat white cards */
+  --snap-gray: #f0f0f3;      /* light gray background for input/secondary button */
+  --snap-light-gray: #e5e5ea;/* border details and icons */
+  --snap-border: #e2e2e8;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* Snapchat Style Flat UI Elements */
+.snap-card {
+  background: var(--snap-dark);
+  border: 2px solid #000000;
+  box-shadow: 0 4px 0 #000000;
+  color: #000000;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.snap-button {
+  background: var(--snap-yellow);
+  color: #000000;
+  font-weight: 700;
+  border-radius: 9999px;
+  border: 2px solid #000000;
+  box-shadow: 0 4px 0 #000000;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.snap-button:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #000000;
+}
+
+.snap-button-secondary {
+  background: var(--snap-gray);
+  color: #000000;
+  font-weight: 700;
+  border-radius: 9999px;
+  border: 2px solid #000000;
+  box-shadow: 0 4px 0 #000000;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.snap-button-secondary:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #000000;
+}
+
+.snap-input {
+  background: var(--snap-gray);
+  border: 2px solid #000000;
+  color: #000000;
+  border-radius: 12px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.snap-input:focus {
+  border-color: #000000;
+}
+
+/* Rounded Profile Header Icons */
+.snap-icon-btn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: var(--snap-dark);
+  border: 2px solid #000000;
+  box-shadow: 0 3px 0 #000000;
+  color: #000000;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  cursor: pointer;
+}
+
+.snap-icon-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #000000;
+}
+
+.snap-icon-btn-active {
+  background: var(--snap-yellow);
+  color: #000000;
+}
+
+/* Custom Scrollbar for Snapchat Chat List */
+.snap-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.snap-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.snap-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--snap-light-gray);
+  border-radius: 9999px;
+  border: 1px solid var(--snap-dark);
+}
+
+.snap-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a6;
+}
+
+/* Text Accent Colors */
+.text-snap-yellow {
+  color: #000000;
+  background-color: var(--snap-yellow);
+}
+
+/* =========================================
+   Aave-style Liquid Glass Nav — desktop only
+   Layered physical glass material:
+   1. frosted backdrop blur base
+   2. semi-transparent white fill (glass body)
+   3. top-edge specular highlight (light hitting glass)
+   4. bottom inner shadow (glass thickness / depth)
+   5. subtle outer drop shadow for elevation
+   ========================================= */
+@media (min-width: 768px) {
+  .liquid-glass-nav {
+    /* Base glass material */
+    background: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(28px) saturate(200%) brightness(1.08);
+    -webkit-backdrop-filter: blur(28px) saturate(200%) brightness(1.08);
+
+    /* Border: top is bright (light source), sides/bottom are dimmer */
+    border: none;
+    box-shadow:
+      /* Outer elevation shadow */
+      0 8px 32px rgba(0, 0, 0, 0.18),
+      0 2px 8px rgba(0, 0, 0, 0.10),
+      /* Top specular highlight — bright white rim where light hits the pill */
+      inset 0 1.5px 0 rgba(255, 255, 255, 0.82),
+      /* Left edge highlight */
+      inset 1px 0 0 rgba(255, 255, 255, 0.35),
+      /* Right edge highlight */
+      inset -1px 0 0 rgba(255, 255, 255, 0.35),
+      /* Bottom inner shadow — glass thickness / underside */
+      inset 0 -1.5px 0 rgba(0, 0, 0, 0.10),
+      /* Subtle inner top gradient diffuse glow */
+      inset 0 6px 16px rgba(255, 255, 255, 0.22);
+
+    transition: box-shadow 0.25s ease, background 0.25s ease;
+  }
+
+  .liquid-glass-nav:hover {
+    background: rgba(255, 255, 255, 0.26);
+    box-shadow:
+      0 10px 40px rgba(0, 0, 0, 0.22),
+      0 3px 10px rgba(0, 0, 0, 0.12),
+      inset 0 1.5px 0 rgba(255, 255, 255, 0.90),
+      inset 1px 0 0 rgba(255, 255, 255, 0.40),
+      inset -1px 0 0 rgba(255, 255, 255, 0.40),
+      inset 0 -1.5px 0 rgba(0, 0, 0, 0.12),
+      inset 0 8px 20px rgba(255, 255, 255, 0.28);
+  }
+
+  /* Glass button hover: frosted pill chip */
+  .liquid-glass-nav button:hover {
+    background: rgba(255, 255, 255, 0.30);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.70),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.08),
+      0 2px 8px rgba(0, 0, 0, 0.10);
+    border-radius: 9999px;
+    color: #000;
+    transition: all 0.18s ease;
+  }
+
+  /* Keep the yellow active button looking correct over glass */
+  .liquid-glass-nav button.no-glass {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
