@@ -717,12 +717,7 @@ export default function WindingThreadPage() {
     initAudio();
     const nextDark = !isDarkMode;
 
-    interface DocumentWithTransition extends Document {
-      startViewTransition?: (callback: () => void) => { ready: Promise<void> };
-    }
-    const doc = document as DocumentWithTransition;
-
-    if (!doc.startViewTransition) {
+    if (!document.startViewTransition) {
       setIsDarkMode(nextDark);
       if (nextDark) {
         document.documentElement.classList.add("dark");
@@ -743,7 +738,7 @@ export default function WindingThreadPage() {
       Math.max(y, window.innerHeight - y)
     );
 
-    const transition = doc.startViewTransition(() => {
+    const transition = document.startViewTransition(() => {
       setIsDarkMode(nextDark);
       if (nextDark) {
         document.documentElement.classList.add("dark");
