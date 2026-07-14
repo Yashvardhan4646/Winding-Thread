@@ -8,6 +8,28 @@
   --snap-gray: #f0f0f3;      /* light gray background for input/secondary button */
   --snap-light-gray: #e5e5ea;/* border details and icons */
   --snap-border: #e2e2e8;
+  --canvas-grid: #e2e2e8;
+  --canvas-path: #c7c7cc;
+  --modal-overlay: rgba(0, 0, 0, 0.2);
+  --text-zinc-500: #71717a;
+  --text-zinc-700: #3f3f46;
+  --input-bg: #ffffff;
+}
+
+.dark {
+  --background: #0b0c10;
+  --foreground: #ffffff;
+  --snap-yellow: #fffc00;
+  --snap-dark: #1f2026;      /* dark cards */
+  --snap-gray: #2d2f39;      /* secondary buttons/inputs */
+  --snap-light-gray: #474a59;
+  --snap-border: #3c3f4c;
+  --canvas-grid: #1e2029;
+  --canvas-path: #474a59;
+  --modal-overlay: rgba(0, 0, 0, 0.6);
+  --text-zinc-500: #a1a1aa;
+  --text-zinc-700: #d4d4d8;
+  --input-bg: #1f2026;
 }
 
 body {
@@ -26,7 +48,7 @@ body {
   background: var(--snap-dark);
   border: 2px solid #000000;
   box-shadow: 0 4px 0 #000000;
-  color: #000000;
+  color: var(--foreground);
   transition: transform 0.2s ease, background-color 0.2s ease;
 }
 
@@ -63,7 +85,7 @@ body {
 .snap-input {
   background: var(--snap-gray);
   border: 2px solid #000000;
-  color: #000000;
+  color: var(--foreground);
   border-radius: 12px;
   outline: none;
   transition: border-color 0.2s ease;
@@ -84,7 +106,7 @@ body {
   background: var(--snap-dark);
   border: 2px solid #000000;
   box-shadow: 0 3px 0 #000000;
-  color: #000000;
+  color: var(--foreground);
   transition: transform 0.1s ease, box-shadow 0.1s ease;
   cursor: pointer;
 }
@@ -191,4 +213,53 @@ body {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
+}
+
+/* Dark Theme Glass Overrides for Desktop Navigation */
+@media (min-width: 768px) {
+  .dark .liquid-glass-nav {
+    background: rgba(0, 0, 0, 0.25);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.4),
+      0 2px 8px rgba(0, 0, 0, 0.3),
+      inset 0 1.5px 0 rgba(255, 255, 255, 0.15),
+      inset 1px 0 0 rgba(255, 255, 255, 0.1),
+      inset -1px 0 0 rgba(255, 255, 255, 0.1),
+      inset 0 -1.5px 0 rgba(0, 0, 0, 0.4),
+      inset 0 6px 16px rgba(255, 255, 255, 0.05);
+  }
+  
+  .dark .liquid-glass-nav:hover {
+    background: rgba(0, 0, 0, 0.35);
+    box-shadow:
+      0 10px 40px rgba(0, 0, 0, 0.45),
+      0 3px 10px rgba(0, 0, 0, 0.35),
+      inset 0 1.5px 0 rgba(255, 255, 255, 0.20),
+      inset 1px 0 0 rgba(255, 255, 255, 0.12),
+      inset -1px 0 0 rgba(255, 255, 255, 0.12),
+      inset 0 -1.5px 0 rgba(0, 0, 0, 0.45),
+      inset 0 8px 20px rgba(255, 255, 255, 0.08);
+  }
+
+  .dark .liquid-glass-nav button:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.20),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.30),
+      0 2px 8px rgba(0, 0, 0, 0.30);
+  }
+}
+
+/* Smooth Circular View Transition API settings */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(root) {
+  z-index: 1;
+}
+::view-transition-new(root) {
+  z-index: 9999;
 }

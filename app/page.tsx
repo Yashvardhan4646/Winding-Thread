@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { Icon } from "@iconify/react";
 
 interface WordRecord {
   id: number;
@@ -60,6 +61,12 @@ export default function WindingThreadPage() {
   const [selectedWordId, setSelectedWordId] = useState<number | null>(null);
   const [isSpotlightTour, setIsSpotlightTour] = useState(false);
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Sync state with HTML class on mount
+  useEffect(() => {
+    setIsDarkMode(document.documentElement.classList.contains("dark"));
+  }, []);
 
   // Refs
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -357,8 +364,8 @@ export default function WindingThreadPage() {
         }
       }
 
-      // Clear with flat light gray
-      ctx.fillStyle = "#f3f3f6";
+      // Clear with flat light gray/dark background
+      ctx.fillStyle = isDarkMode ? "#0b0c10" : "#f3f3f6";
       ctx.fillRect(0, 0, width, height);
 
       const project2D = (px: number, py: number) => {
@@ -368,7 +375,7 @@ export default function WindingThreadPage() {
       };
 
       // 1. Draw Flat Grid Map Lines (Soft gray grid)
-      ctx.strokeStyle = "#e2e2e8";
+      ctx.strokeStyle = isDarkMode ? "#1e2029" : "#e2e2e8";
       ctx.lineWidth = 1.0;
 
       const gridSpacing = 160;
@@ -398,7 +405,7 @@ export default function WindingThreadPage() {
       // 2. Draw Connection Thread Pathway (Flat dark gray with yellow core)
       if (words.length > 0) {
         ctx.beginPath();
-        ctx.strokeStyle = "#c7c7cc";
+        ctx.strokeStyle = isDarkMode ? "#474a59" : "#c7c7cc";
         ctx.lineWidth = Math.max(1.5, 4 * camera.scale);
 
         words.forEach((_, idx) => {
@@ -440,7 +447,7 @@ export default function WindingThreadPage() {
 
           ctx.beginPath();
           ctx.arc(proj.x, proj.y, Math.max(3, 6 * camera.scale), 0, Math.PI * 2);
-          ctx.fillStyle = isSelected || isHovered ? "#fffc00" : "#ffffff";
+          ctx.fillStyle = isSelected || isHovered ? "#fffc00" : (isDarkMode ? "#2d2f39" : "#ffffff");
           ctx.strokeStyle = "#000000";
           ctx.lineWidth = 2.5;
           ctx.fill();
@@ -480,7 +487,7 @@ export default function WindingThreadPage() {
           ctx.fill();
 
           // Bubble Body: White bubble by default, Yellow on hover/select
-          ctx.fillStyle = isSelected || isHovered ? "#fffc00" : "#ffffff";
+          ctx.fillStyle = isSelected || isHovered ? "#fffc00" : (isDarkMode ? "#1f2026" : "#ffffff");
           ctx.strokeStyle = "#000000";
           ctx.lineWidth = 2.5;
 
@@ -490,7 +497,7 @@ export default function WindingThreadPage() {
           ctx.stroke();
 
           // Speech bubble bottom indicator triangle
-          ctx.fillStyle = isSelected || isHovered ? "#fffc00" : "#ffffff";
+          ctx.fillStyle = isSelected || isHovered ? "#fffc00" : (isDarkMode ? "#1f2026" : "#ffffff");
           ctx.beginPath();
           ctx.moveTo(proj.x - 8 * camera.scale, by + bubbleH - 1);
           ctx.lineTo(proj.x, by + bubbleH + (8 * camera.scale));
@@ -500,7 +507,7 @@ export default function WindingThreadPage() {
           ctx.stroke();
 
           // Bubble Text
-          ctx.fillStyle = "#000000";
+          ctx.fillStyle = isSelected || isHovered ? "#000000" : (isDarkMode ? "#ffffff" : "#000000");
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.fillText(labelText, proj.x, by + bubbleH / 2);
@@ -513,7 +520,7 @@ export default function WindingThreadPage() {
 
     animationId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animationId);
-  }, [words, selectedWordId, hoveredWordId]);
+  }, [words, selectedWordId, hoveredWordId, isDarkMode]);
 
   // Mouse handlers
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -667,6 +674,59 @@ export default function WindingThreadPage() {
     setTimeout(() => setCopiedUpi(false), 2000);
   };
 
+  const toggleTheme = (e: React.MouseEvent<HTMLButtonElement>) => {
+    initAudio();
+    const nextDark = !isDarkMode;
+
+    if (!(document as any).startViewTransition) {
+      setIsDarkMode(nextDark);
+      if (nextDark) {
+        document.documentElement.classList.add("dark");
+        localStorage.setItem("theme", "dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+        localStorage.setItem("theme", "light");
+      }
+      return;
+    }
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+
+    const endRadius = Math.hypot(
+      Math.max(x, window.innerWidth - x),
+      Math.max(y, window.innerHeight - y)
+    );
+
+    const transition = (document as any).startViewTransition(() => {
+      setIsDarkMode(nextDark);
+      if (nextDark) {
+        document.documentElement.classList.add("dark");
+        localStorage.setItem("theme", "dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+        localStorage.setItem("theme", "light");
+      }
+    });
+
+    transition.ready.then(() => {
+      document.documentElement.animate(
+        {
+          clipPath: [
+            `circle(0px at ${x}px ${y}px)`,
+            `circle(${endRadius}px at ${x}px ${y}px)`,
+          ],
+        },
+        {
+          duration: 600,
+          easing: "ease-in-out",
+          pseudoElement: "::view-transition-new(root)",
+        }
+      );
+    });
+  };
+
   const jumpToRandomWord = () => {
     if (words.length === 0) return;
     initAudio();
@@ -708,7 +768,7 @@ export default function WindingThreadPage() {
   }, [selectedWordId, words]);
 
   return (
-    <div className="relative w-screen bg-[#f3f3f6] text-black overflow-hidden font-sans select-none" style={{ height: "100dvh" }}>
+    <div className="relative w-screen bg-[var(--background)] text-[var(--foreground)] overflow-hidden font-sans select-none" style={{ height: "100dvh" }}>
 
       {/* 2D Grid Canvas Map */}
       <canvas
@@ -737,15 +797,15 @@ export default function WindingThreadPage() {
               <path d="M141.537 88.9883C140.71 88.5919 139.87 88.2104 139.019 87.8451C137.537 60.5382 122.616 44.905 97.5619 44.745C97.4484 44.7443 97.3355 44.7443 97.222 44.7443C82.2364 44.7443 69.7731 51.1409 62.102 62.7807L75.881 72.2328C81.6116 63.5383 90.6052 61.6848 97.2286 61.6848C97.3051 61.6848 97.3819 61.6848 97.4576 61.6855C105.707 61.7381 111.932 64.1366 115.961 68.814C118.893 72.2193 120.854 76.925 121.825 82.8638C114.511 81.6207 106.601 81.2385 98.145 81.7233C74.3247 83.0954 59.0111 96.9879 60.0396 116.292C60.5615 126.084 65.4397 134.508 73.775 140.011C80.8224 144.663 89.899 146.938 99.3323 146.423C111.79 145.74 121.563 140.987 128.381 132.296C133.559 125.696 136.834 117.143 138.28 106.366C144.217 109.949 148.617 114.664 151.047 120.332C155.179 129.967 155.42 145.8 142.501 158.708C131.182 170.016 117.576 174.908 97.0135 175.059C74.2042 174.89 56.9538 167.575 45.7381 153.317C35.2355 139.966 29.8077 120.682 29.6052 96C29.8077 71.3178 35.2355 52.0336 45.7381 38.6827C56.9538 24.4249 74.2039 17.11 97.0132 16.9405C119.988 17.1113 137.539 24.4614 149.184 38.788C154.894 45.8136 159.199 54.6488 162.037 64.9503L178.184 60.6422C174.744 47.9622 169.331 37.0357 161.965 27.974C147.036 9.60668 125.202 0.195148 97.0695 0H96.9569C68.8816 0.19447 47.2921 9.6418 32.7883 28.0793C19.8819 44.4864 13.2244 67.3157 13.0007 95.9325L13 96L13.0007 96.0675C13.2244 124.684 19.8819 147.514 32.7883 163.921C47.2921 182.358 68.8816 191.806 96.9569 192H97.0695C122.03 191.827 139.624 185.292 154.118 170.811C173.081 151.866 172.51 128.119 166.26 113.541C161.776 103.087 153.227 94.5962 141.537 88.9883ZM98.4405 129.507C88.0005 130.095 77.1544 125.409 76.6196 115.372C76.2232 107.93 81.9158 99.626 99.0812 98.6368C101.047 98.5234 102.976 98.468 104.871 98.468C111.106 98.468 116.939 99.0737 122.242 100.233C120.264 124.935 108.662 128.946 98.4405 129.507Z" />
             </svg>
           </div>
-          {/* Title Badge: hidden on small mobile view for clean scaling */}
-          <div className="snap-card px-3.5 py-1.5 rounded-full bg-white flex items-center justify-center scale-90 md:scale-100 hidden sm:flex">
-            <span className="text-[10px] md:text-xs font-mono font-bold text-black uppercase tracking-widest">
+          {/* Title Badge */}
+          <div className="snap-card px-3.5 py-1.5 rounded-full bg-[var(--snap-dark)] flex items-center justify-center scale-90 md:scale-100 hidden sm:flex">
+            <span className="text-[10px] md:text-xs font-mono font-bold text-[var(--foreground)] uppercase tracking-widest">
               Winding Thread
             </span>
           </div>
         </div>
 
-        {/* Right side: Leaderboard trophy + sound mute buttons */}
+        {/* Right side: Leaderboard trophy + sound mute + theme toggle buttons */}
         <div className="pointer-events-auto flex items-center gap-2 md:gap-3">
           {/* Trophy button (Leaderboard) */}
           <button
@@ -756,9 +816,7 @@ export default function WindingThreadPage() {
             title="Country Leaderboard"
             className={`snap-icon-btn scale-90 md:scale-100 ${isLeaderboardOpen ? "snap-icon-btn-active" : ""}`}
           >
-            <svg className="w-5.5 h-5.5 fill-current" viewBox="0 0 576 512">
-              <path d="M400 0H176c-26.5 0-48 21.5-48 48v112c0 33.8 12.1 64.7 32 88.9V384h-16c-17.7 0-32 14.3-32 32v64H96c-17.7 0-32 14.3-32 32h384c0-17.7-14.3-32-32-32h-32v-64c0-17.7-14.3-32-32-32h-16V248.9c19.9-24.2 32-55.1 32-88.9V48c0-26.5-21.5-48-48-48zM96 64h32v128c0 14.1-3.7 27.2-10.2 38.6C102.7 241.9 80 223 80 192V80c0-8.8 7.2-16 16-16zm400 128c0 31-22.7 49.9-37.8 58.6-6.5-11.4-10.2-24.5-10.2-38.6V64h32c8.8 0 16 7.2 16 16v112z" />
-            </svg>
+            <Icon icon="lucide:trophy" className="w-5.5 h-5.5" />
           </button>
 
           {/* Support Dev — big pill button */}
@@ -774,7 +832,7 @@ export default function WindingThreadPage() {
                 : "bg-[#fffc00] text-black"
             }`}
           >
-            <span className="text-base leading-none">₹</span>
+            <Icon icon="lucide:indian-rupee" className="w-4 h-4 shrink-0" />
             <span className="hidden sm:inline">Support Dev</span>
           </button>
 
@@ -787,9 +845,22 @@ export default function WindingThreadPage() {
             className={`snap-icon-btn scale-90 md:scale-100 ${!isMuted ? "snap-icon-btn-active" : ""}`}
           >
             {isMuted ? (
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.03c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73 4.27 3zM12 4L9.91 6.09 12 8.18V4z" /></svg>
+              <Icon icon="lucide:volume-x" className="w-5 h-5" />
             ) : (
-              <svg className="w-5 h-5 fill-black" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" /></svg>
+              <Icon icon="lucide:volume-2" className="w-5 h-5" />
+            )}
+          </button>
+
+          {/* Theme Toggle Button */}
+          <button
+            onClick={toggleTheme}
+            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            className="snap-icon-btn scale-90 md:scale-100"
+          >
+            {isDarkMode ? (
+              <Icon icon="lucide:sun" className="w-5.5 h-5.5" />
+            ) : (
+              <Icon icon="lucide:moon" className="w-5 h-5" />
             )}
           </button>
         </div>
@@ -798,47 +869,47 @@ export default function WindingThreadPage() {
       {/* Leaderboard Modal — blurred backdrop */}
       {isLeaderboardOpen && (
         <div
-          className="absolute inset-0 z-30 flex items-center justify-center backdrop-blur-sm bg-black/20 animate-[fadeIn_0.15s_ease]"
+          className="absolute inset-0 z-30 flex items-center justify-center backdrop-blur-sm bg-[var(--modal-overlay)] animate-[fadeIn_0.15s_ease]"
           onClick={() => setIsLeaderboardOpen(false)}
         >
           <div
             className="w-[92%] max-w-sm snap-card rounded-2xl p-5 border-2 border-black animate-[scaleUp_0.2s_ease]"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center border-b border-[#e5e5ea] pb-3 mb-4">
+            <div className="flex justify-between items-center border-b border-[var(--snap-light-gray)] pb-3 mb-4">
               <div className="flex items-center gap-2">
                 <span className="text-xl">🏆</span>
-                <h3 className="text-sm font-black uppercase tracking-wider text-black">
+                <h3 className="text-sm font-black uppercase tracking-wider text-[var(--foreground)]">
                   Country Leaderboard
                 </h3>
               </div>
               <button
                 onClick={() => setIsLeaderboardOpen(false)}
-                className="text-zinc-500 hover:text-black font-mono text-xs cursor-pointer p-1"
+                className="text-[var(--text-zinc-500)] hover:text-[var(--foreground)] cursor-pointer p-1 transition-transform hover:scale-110 active:scale-95"
               >
-                x
+                <Icon icon="lucide:x" className="w-4 h-4" />
               </button>
             </div>
 
             <div className="max-h-60 overflow-y-auto snap-scrollbar pr-1 flex flex-col gap-2 font-mono text-xs">
               {leaderboardData.length === 0 ? (
-                <div className="text-zinc-500 italic py-2">No country data recorded yet.</div>
+                <div className="text-[var(--text-zinc-500)] italic py-2">No country data recorded yet.</div>
               ) : (
                 leaderboardData.map((item, idx) => (
                   <div
                     key={item.countryCode}
-                    className="flex items-center justify-between p-2.5 bg-[#f0f0f3] border-2 border-black rounded-xl"
+                    className="flex items-center justify-between p-2.5 bg-[var(--snap-gray)] border-2 border-black rounded-xl"
                   >
                     <div className="flex items-center gap-3">
                       {/* Rank Circle badge */}
-                      <div className={`w-6 h-6 rounded-full border border-black flex items-center justify-center font-bold text-[10px] ${idx === 0 ? "bg-[#fffc00]" : "bg-white"
+                      <div className={`w-6 h-6 rounded-full border border-black flex items-center justify-center font-bold text-[10px] ${idx === 0 ? "bg-[#fffc00] text-black" : "bg-[var(--snap-dark)] text-[var(--foreground)]"
                         }`}>
                         {idx + 1}
                       </div>
                       <span className="text-base">{getFlagEmoji(item.countryCode)}</span>
                       <span className="font-extrabold uppercase">{item.countryCode}</span>
                     </div>
-                    <div className="text-black font-bold">
+                    <div className="text-[var(--foreground)] font-bold">
                       {item.count} {item.count === 1 ? "word" : "words"}
                     </div>
                   </div>
@@ -852,42 +923,42 @@ export default function WindingThreadPage() {
       {/* Support Dev Modal — blurred backdrop */}
       {isSupportOpen && (
         <div
-          className="absolute inset-0 z-30 flex items-center justify-center backdrop-blur-sm bg-black/20 animate-[fadeIn_0.15s_ease]"
+          className="absolute inset-0 z-30 flex items-center justify-center backdrop-blur-sm bg-[var(--modal-overlay)] animate-[fadeIn_0.15s_ease]"
           onClick={() => setIsSupportOpen(false)}
         >
           <div
             className="w-[92%] max-w-sm snap-card rounded-2xl p-5 border-2 border-black animate-[scaleUp_0.2s_ease]"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center border-b border-[#e5e5ea] pb-3 mb-4">
+            <div className="flex justify-between items-center border-b border-[var(--snap-light-gray)] pb-3 mb-4">
               <div className="flex items-center gap-2">
                 <span className="text-xl">❤️</span>
-                <h3 className="text-sm font-black uppercase tracking-wider text-black">
+                <h3 className="text-sm font-black uppercase tracking-wider text-[var(--foreground)]">
                   Support the Dev
                 </h3>
               </div>
               <button
                 onClick={() => setIsSupportOpen(false)}
-                className="text-zinc-500 hover:text-black font-mono text-xs cursor-pointer p-1"
+                className="text-[var(--text-zinc-500)] hover:text-[var(--foreground)] cursor-pointer p-1 transition-transform hover:scale-110 active:scale-95"
               >
-                x
+                <Icon icon="lucide:x" className="w-4 h-4" />
               </button>
             </div>
 
             <div className="text-center space-y-4">
-              <p className="text-xs font-semibold text-zinc-700 leading-relaxed">
+              <p className="text-xs font-semibold text-[var(--text-zinc-700)] leading-relaxed">
                 If you enjoy The Winding Thread, consider supporting the developer to help keep it running and ad-free! Any amount counts. 🙏
               </p>
 
-              <div className="bg-[#f0f0f3] border-2 border-black rounded-xl p-4 flex flex-col items-center gap-3">
+              <div className="bg-[var(--snap-gray)] border-2 border-black rounded-xl p-4 flex flex-col items-center gap-3">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">🇮🇳</span>
-                  <span className="text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-widest">
+                  <span className="text-[10px] font-mono font-bold text-[var(--text-zinc-500)] uppercase tracking-widest">
                     UPI Payment
                   </span>
                 </div>
-                <div className="flex w-full items-center gap-2 bg-white border-2 border-black rounded-xl p-2.5">
-                  <span className="flex-1 font-mono text-xs font-bold text-center text-zinc-800 select-all">
+                <div className="flex w-full items-center gap-2 bg-[var(--snap-dark)] border-2 border-black rounded-xl p-2.5">
+                  <span className="flex-1 font-mono text-xs font-bold text-center text-[var(--foreground)] select-all">
                     {UPI_ID}
                   </span>
                   <button
@@ -899,7 +970,7 @@ export default function WindingThreadPage() {
                     {copiedUpi ? "✓ Copied!" : "Copy"}
                   </button>
                 </div>
-                <p className="text-[9px] font-mono text-zinc-400">
+                <p className="text-[9px] font-mono text-[var(--text-zinc-500)]">
                   Open any UPI app (Google Pay, PhonePe, Paytm) and send to the above ID
                 </p>
               </div>
@@ -916,47 +987,48 @@ export default function WindingThreadPage() {
         >
           <div className="flex items-start justify-between mb-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-full bg-[#f0f0f3] border-2 border-black flex items-center justify-center font-bold text-sm text-black">
+              <div className="w-10 h-10 rounded-full bg-[var(--snap-gray)] border-2 border-black flex items-center justify-center font-bold text-sm text-[var(--foreground)]">
                 {selectedRecord.author.substring(0, 2).toUpperCase()}
               </div>
               <div>
-                <span className="text-[10px] font-mono text-zinc-500 block">Contributor</span>
-                <span className="text-sm font-bold text-black leading-tight flex items-center gap-1.5">
+                <span className="text-[10px] font-mono text-[var(--text-zinc-500)] block">Contributor</span>
+                <span className="text-sm font-bold text-[var(--foreground)] leading-tight flex items-center gap-1.5">
                   {selectedRecord.author} {selectedRecord.country && <span>{getFlagEmoji(selectedRecord.country)}</span>}
                 </span>
               </div>
             </div>
             <button
               onClick={() => setSelectedWordId(null)}
-              className="text-zinc-500 hover:text-black text-xs font-mono cursor-pointer p-1"
+              className="text-[var(--text-zinc-500)] hover:text-[var(--foreground)] cursor-pointer p-1 transition-transform hover:scale-110 active:scale-95"
+              title="Close drawer"
             >
-              [close]
+              <Icon icon="lucide:x" className="w-4.5 h-4.5" />
             </button>
           </div>
 
-          <div className="bg-[#f0f0f3] border-2 border-black rounded-xl p-3 mb-3 text-left">
-            <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider block mb-0.5">
+          <div className="bg-[var(--snap-gray)] border-2 border-black rounded-xl p-3 mb-3 text-left">
+            <span className="text-[9px] font-mono text-[var(--text-zinc-500)] uppercase tracking-wider block mb-0.5">
               MESSAGE SENT
             </span>
-            <p className="text-lg font-black text-black uppercase tracking-tight truncate">
+            <p className="text-lg font-black text-[var(--foreground)] uppercase tracking-tight truncate">
               "{selectedRecord.word}"
             </p>
           </div>
 
-          <div className="space-y-1.5 font-mono text-[9px] text-zinc-500 border-t border-[#e5e5ea] pt-2.5">
+          <div className="space-y-1.5 font-mono text-[9px] text-[var(--text-zinc-500)] border-t border-[var(--snap-light-gray)] pt-2.5">
             <div className="flex justify-between">
               <span>Timestamp:</span>
-              <span className="text-zinc-700">{new Date(selectedRecord.timestamp).toLocaleString()}</span>
+              <span className="text-[var(--text-zinc-700)]">{new Date(selectedRecord.timestamp).toLocaleString()}</span>
             </div>
             {selectedRecord.country && (
               <div className="flex justify-between">
                 <span>Origin:</span>
-                <span className="text-zinc-700 uppercase">{selectedRecord.country} ({getFlagEmoji(selectedRecord.country)})</span>
+                <span className="text-[var(--text-zinc-700)] uppercase">{selectedRecord.country} ({getFlagEmoji(selectedRecord.country)})</span>
               </div>
             )}
             <div className="flex justify-between">
               <span>Node ID:</span>
-              <span className="text-zinc-700">#{selectedRecord.id}</span>
+              <span className="text-[var(--text-zinc-700)]">#{selectedRecord.id}</span>
             </div>
           </div>
         </div>
@@ -981,7 +1053,7 @@ export default function WindingThreadPage() {
         {/* Input Bar Overlay */}
         <form
           onSubmit={handleWordSubmit}
-          className="pointer-events-auto flex items-center gap-2 bg-white border-2 border-black rounded-full p-1.5 shadow-[0_4px_0_#000]"
+          className="pointer-events-auto flex items-center gap-2 bg-[var(--snap-dark)] border-2 border-black rounded-full p-1.5 shadow-[0_4px_0_#000]"
         >
           <input
             type="text"
@@ -990,7 +1062,7 @@ export default function WindingThreadPage() {
             placeholder="Send a word to the Thread..."
             maxLength={15}
             disabled={submitting}
-            className="bg-transparent h-9 px-3 flex-1 text-sm font-bold text-black outline-none placeholder-zinc-400 min-w-0"
+            className="bg-transparent h-9 px-3 flex-1 text-sm font-bold text-[var(--foreground)] outline-none placeholder-zinc-400 min-w-0"
           />
           <input
             type="text"
@@ -999,16 +1071,14 @@ export default function WindingThreadPage() {
             placeholder="Alias"
             maxLength={14}
             disabled={submitting}
-            className="bg-[#f0f0f3] border-2 border-black h-9 px-2 w-16 md:w-20 text-xs font-bold text-black rounded-full outline-none text-center min-w-0"
+            className="bg-[var(--snap-gray)] border-2 border-black h-9 px-2 w-16 md:w-20 text-xs font-bold text-[var(--foreground)] rounded-full outline-none text-center min-w-0"
           />
           <button
             type="submit"
             disabled={submitting}
             className="w-9 h-9 flex items-center justify-center rounded-full bg-[#fffc00] text-black border-2 border-black hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0 disabled:opacity-50"
           >
-            <svg className="w-4.5 h-4.5 fill-black" viewBox="0 0 24 24">
-              <path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" />
-            </svg>
+            <Icon icon="lucide:arrow-right" className="w-4.5 h-4.5 text-black" />
           </button>
         </form>
 
@@ -1016,7 +1086,7 @@ export default function WindingThreadPage() {
         <nav
           ref={navRef}
           className="pointer-events-auto relative h-14 rounded-full px-8 flex items-center justify-between overflow-hidden
-            bg-white border-2 border-black shadow-[0_4px_0_#000]
+            bg-[var(--snap-dark)] border-2 border-black shadow-[0_4px_0_#000]
             md:liquid-glass-nav md:border-0 md:shadow-none"
         >
 
@@ -1026,28 +1096,19 @@ export default function WindingThreadPage() {
               initAudio();
               recenterMap();
             }}
-            className="flex flex-col items-center justify-center w-9 h-9 rounded-full text-zinc-500 hover:text-black hover:bg-zinc-100 transition-all cursor-pointer"
+            className="flex flex-col items-center justify-center w-9 h-9 rounded-full text-[var(--text-zinc-500)] hover:text-[var(--foreground)] hover:bg-[var(--snap-gray)] transition-all cursor-pointer"
             title="Recenter to Origin"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
-            </svg>
+            <Icon icon="lucide:home" className="w-5 h-5" />
           </button>
 
           {/* Dice: jump to a random word */}
           <button
             onClick={jumpToRandomWord}
-            className="flex flex-col items-center justify-center w-9 h-9 rounded-full text-zinc-500 hover:text-black hover:bg-zinc-100 transition-all cursor-pointer"
+            className="flex flex-col items-center justify-center w-9 h-9 rounded-full text-[var(--text-zinc-500)] hover:text-[var(--foreground)] hover:bg-[var(--snap-gray)] transition-all cursor-pointer"
             title="Jump to Random Word"
           >
-            <svg className="w-5 h-5 fill-none stroke-current" strokeWidth="2.5" viewBox="0 0 24 24">
-              <rect x="3" y="3" width="18" height="18" rx="4" ry="4" />
-              <circle cx="8" cy="8" r="1.2" fill="currentColor" />
-              <circle cx="16" cy="16" r="1.2" fill="currentColor" />
-              <circle cx="12" cy="12" r="1.2" fill="currentColor" />
-              <circle cx="16" cy="8" r="1.2" fill="currentColor" />
-              <circle cx="8" cy="16" r="1.2" fill="currentColor" />
-            </svg>
+            <Icon icon="lucide:dices" className="w-5 h-5" />
           </button>
 
           {/* Focus on Current Tail Word (Focus Newest Node) */}
@@ -1056,12 +1117,10 @@ export default function WindingThreadPage() {
               initAudio();
               recenterToTail();
             }}
-            className="w-10 h-10 rounded-full bg-[#f0f0f3] border-2 border-black flex items-center justify-center text-black hover:bg-[#fffc00] active:scale-95 transition-all cursor-pointer"
+            className="w-10 h-10 rounded-full bg-[var(--snap-gray)] border-2 border-black flex items-center justify-center text-[var(--foreground)] hover:text-black hover:bg-[#fffc00] active:scale-95 transition-all cursor-pointer"
             title="Focus Newest Word"
           >
-            <svg className="w-5.5 h-5.5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" />
-            </svg>
+            <Icon icon="lucide:crosshair" className="w-5.5 h-5.5" />
           </button>
 
           {/* Toggle Spotlight Auto-Tour Mode */}
@@ -1070,15 +1129,16 @@ export default function WindingThreadPage() {
               initAudio();
               setIsSpotlightTour(!isSpotlightTour);
             }}
-            className={`flex flex-col items-center justify-center w-9 h-9 rounded-full cursor-pointer ${isSpotlightTour ? "text-black bg-[#fffc00] border-2 border-black animate-pulse" : "text-zinc-500 hover:text-black hover:bg-zinc-100"
+            className={`flex flex-col items-center justify-center w-9 h-9 rounded-full cursor-pointer transition-all ${isSpotlightTour ? "text-black bg-[#fffc00] border-2 border-black animate-pulse" : "text-[var(--text-zinc-500)] hover:text-[var(--foreground)] hover:bg-[var(--snap-gray)]"
               }`}
             title="Auto Spotlight Tour"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
-            </svg>
+            {isSpotlightTour ? (
+              <Icon icon="lucide:pause" className="w-5 h-5" />
+            ) : (
+              <Icon icon="lucide:play" className="w-5 h-5" />
+            )}
           </button>
-
         </nav>
       </div>
     </div>
