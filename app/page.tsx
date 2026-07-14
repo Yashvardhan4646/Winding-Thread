@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Icon } from "@iconify/react";
 
 interface WordRecord {
@@ -34,7 +34,7 @@ const getFlagEmoji = (countryCode: string) => {
     .map((char) => 127397 + char.charCodeAt(0));
   try {
     return String.fromCodePoint(...codePoints);
-  } catch (e) {
+  } catch {
     return "🌍";
   }
 };
@@ -45,7 +45,7 @@ const UPI_ID = "yashvardhan4646@okicici";
 export default function WindingThreadPage() {
   // Data state
   const [words, setWords] = useState<WordRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Data loading status is handled directly via fetch status
   const [submitting, setSubmitting] = useState(false);
   const [inputWord, setInputWord] = useState("");
   const [inputAuthor, setInputAuthor] = useState("");
@@ -62,11 +62,16 @@ export default function WindingThreadPage() {
   const [isSpotlightTour, setIsSpotlightTour] = useState(false);
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isRulesOpen, setIsRulesOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Sync state with HTML class on mount
-  useEffect(() => {
-    setIsDarkMode(document.documentElement.classList.contains("dark"));
-  }, []);
+    // Sync state with HTML class on mount
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        setIsDarkMode(document.documentElement.classList.contains("dark"));
+      }, 0);
+      return () => clearTimeout(timer);
+    }, []);
 
   // Refs
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -130,21 +135,24 @@ export default function WindingThreadPage() {
       }
     } catch (e) {
       console.error(e);
-    } finally {
-      setLoading(false);
     }
   };
 
-  // Poll for updates
-  useEffect(() => {
-    fetchThreadData();
-    const interval = setInterval(() => {
-      if (!submitting && !targetCamRef.current.active && !dragRef.current.isDragging) {
+    // Poll for updates
+    useEffect(() => {
+      const timer = setTimeout(() => {
         fetchThreadData();
-      }
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [submitting]);
+      }, 0);
+      const interval = setInterval(() => {
+        if (!submitting && !targetCamRef.current.active && !dragRef.current.isDragging) {
+          fetchThreadData();
+        }
+      }, 4000);
+      return () => {
+        clearTimeout(timer);
+        clearInterval(interval);
+      };
+    }, [submitting]);
 
   // Fetch client's public IP address for local testing country detection
   useEffect(() => {
@@ -164,12 +172,17 @@ export default function WindingThreadPage() {
     getPublicIp();
   }, []);
 
-  // Audio setup
-  const initAudio = () => {
-    if (audioCtxRef.current) return;
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      const ctx = new AudioCtx();
+    // Audio setup
+    const initAudio = () => {
+      if (audioCtxRef.current) return;
+      try {
+        interface WindowWithWebkit extends Window {
+          webkitAudioContext?: typeof AudioContext;
+        }
+        const win = window as unknown as WindowWithWebkit;
+        const AudioCtx = window.AudioContext || win.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
 
       const delay = ctx.createDelay(1.0);
       delay.delayTime.value = 0.25;
@@ -194,40 +207,40 @@ export default function WindingThreadPage() {
     }
   };
 
-  // Play chime synth
-  const playChime = (wordId: number, isMajor = true) => {
-    if (isMuted || !audioCtxRef.current) return;
-    const ctx = audioCtxRef.current;
-    if (ctx.state === "suspended") ctx.resume();
+    // Play chime synth
+    const playChime = useCallback((wordId: number, isMajor = true) => {
+      if (isMuted || !audioCtxRef.current) return;
+      const ctx = audioCtxRef.current;
+      if (ctx.state === "suspended") ctx.resume();
 
-    try {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
+      try {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
 
-      const pentatonicScales = [261.63, 293.66, 329.63, 392.00, 440.00];
-      const scaleIndex = wordId % pentatonicScales.length;
-      const octaveOffset = Math.floor(wordId / pentatonicScales.length) % 2;
-      const freq = pentatonicScales[scaleIndex] * (octaveOffset + 1);
+        const pentatonicScales = [261.63, 293.66, 329.63, 392.00, 440.00];
+        const scaleIndex = wordId % pentatonicScales.length;
+        const octaveOffset = Math.floor(wordId / pentatonicScales.length) % 2;
+        const freq = pentatonicScales[scaleIndex] * (octaveOffset + 1);
 
-      osc.frequency.value = freq;
-      osc.type = isMajor ? "sine" : "triangle";
+        osc.frequency.value = freq;
+        osc.type = isMajor ? "sine" : "triangle";
 
-      gain.gain.setValueAtTime(0, ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(isMajor ? 0.15 : 0.22, ctx.currentTime + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + (isMajor ? 0.6 : 1.4));
+        gain.gain.setValueAtTime(0, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(isMajor ? 0.15 : 0.22, ctx.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + (isMajor ? 0.6 : 1.4));
 
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      if (audioDelayNodeRef.current) {
-        gain.connect(audioDelayNodeRef.current);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        if (audioDelayNodeRef.current) {
+          gain.connect(audioDelayNodeRef.current);
+        }
+
+        osc.start();
+        osc.stop(ctx.currentTime + (isMajor ? 0.7 : 1.6));
+      } catch (e) {
+        console.error(e);
       }
-
-      osc.start();
-      osc.stop(ctx.currentTime + (isMajor ? 0.7 : 1.6));
-    } catch (e) {
-      console.error(e);
-    }
-  };
+    }, [isMuted]);
 
   // Submit word
   const handleWordSubmit = async (e: React.FormEvent) => {
@@ -277,11 +290,12 @@ export default function WindingThreadPage() {
         scale: 1.2,
         active: true,
       };
-    } catch (err: any) {
-      setErrorMsg(err.message || "Failed to submit.");
-    } finally {
-      setSubmitting(false);
-    }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to submit.";
+        setErrorMsg(errorMessage);
+      } finally {
+        setSubmitting(false);
+      }
   };
 
   const getWordCoordinates = (index: number) => {
@@ -320,7 +334,7 @@ export default function WindingThreadPage() {
     }, 4500);
 
     return () => clearInterval(tourInterval);
-  }, [isSpotlightTour, words]);
+  }, [isSpotlightTour, words, playChime]);
 
   // Main Canvas Rendering Loop
   useEffect(() => {
@@ -364,8 +378,25 @@ export default function WindingThreadPage() {
         }
       }
 
-      // Clear with flat light gray/dark background
-      ctx.fillStyle = isDarkMode ? "#0b0c10" : "#f3f3f6";
+      // Clear with radial gradient for a premium mesh glow effect
+      const bgGrad = ctx.createRadialGradient(
+        width / 2,
+        height / 2,
+        20,
+        width / 2,
+        height / 2,
+        Math.max(width, height) * 0.95
+      );
+      if (isDarkMode) {
+        bgGrad.addColorStop(0, "#151226"); // Deep indigo center glow
+        bgGrad.addColorStop(0.6, "#0b0c10"); // Slate dark gray
+        bgGrad.addColorStop(1, "#07070a"); // Dark outer edges
+      } else {
+        bgGrad.addColorStop(0, "#fafafc"); // Clean white center glow
+        bgGrad.addColorStop(0.6, "#f0f0f4"); // Soft slate mid-tone
+        bgGrad.addColorStop(1, "#e6e6ec"); // Slate gray outer edges
+      }
+      ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, width, height);
 
       const project2D = (px: number, py: number) => {
@@ -374,8 +405,8 @@ export default function WindingThreadPage() {
         return { x: sx, y: sy };
       };
 
-      // 1. Draw Flat Grid Map Lines (Soft gray grid)
-      ctx.strokeStyle = isDarkMode ? "#1e2029" : "#e2e2e8";
+      // 1. Draw Flat Grid Map Lines (Solid cool lines)
+      ctx.strokeStyle = isDarkMode ? "#232536" : "#d8dae3";
       ctx.lineWidth = 1.0;
 
       const gridSpacing = 160;
@@ -456,7 +487,7 @@ export default function WindingThreadPage() {
           // Render country code with word if available
           const flag = w.country ? getFlagEmoji(w.country) : "";
           const labelText = `${flag} #${w.id} ${w.word}`;
-          let sizeBase = isSelected ? 15 : isHovered ? 14 : 12;
+          const sizeBase = isSelected ? 15 : isHovered ? 14 : 12;
           let fontSize = sizeBase * camera.scale;
           fontSize = Math.max(8, Math.min(fontSize, 45));
 
@@ -483,7 +514,11 @@ export default function WindingThreadPage() {
           // Draw Flat Drop Shadow
           ctx.fillStyle = "#000000";
           ctx.beginPath();
-          ctx.roundRect ? ctx.roundRect(bx, by + 3, bubbleW, bubbleH, 12) : ctx.rect(bx, by + 3, bubbleW, bubbleH);
+          if (ctx.roundRect) {
+            ctx.roundRect(bx, by + 3, bubbleW, bubbleH, 12);
+          } else {
+            ctx.rect(bx, by + 3, bubbleW, bubbleH);
+          }
           ctx.fill();
 
           // Bubble Body: White bubble by default, Yellow on hover/select
@@ -492,7 +527,11 @@ export default function WindingThreadPage() {
           ctx.lineWidth = 2.5;
 
           ctx.beginPath();
-          ctx.roundRect ? ctx.roundRect(bx, by, bubbleW, bubbleH, 12) : ctx.rect(bx, by, bubbleW, bubbleH);
+          if (ctx.roundRect) {
+            ctx.roundRect(bx, by, bubbleW, bubbleH, 12);
+          } else {
+            ctx.rect(bx, by, bubbleW, bubbleH);
+          }
           ctx.fill();
           ctx.stroke();
 
@@ -678,7 +717,12 @@ export default function WindingThreadPage() {
     initAudio();
     const nextDark = !isDarkMode;
 
-    if (!(document as any).startViewTransition) {
+    interface DocumentWithTransition extends Document {
+      startViewTransition?: (callback: () => void) => { ready: Promise<void> };
+    }
+    const doc = document as DocumentWithTransition;
+
+    if (!doc.startViewTransition) {
       setIsDarkMode(nextDark);
       if (nextDark) {
         document.documentElement.classList.add("dark");
@@ -699,7 +743,7 @@ export default function WindingThreadPage() {
       Math.max(y, window.innerHeight - y)
     );
 
-    const transition = (document as any).startViewTransition(() => {
+    const transition = doc.startViewTransition(() => {
       setIsDarkMode(nextDark);
       if (nextDark) {
         document.documentElement.classList.add("dark");
@@ -767,6 +811,77 @@ export default function WindingThreadPage() {
     return words.find((w) => w.id === selectedWordId) || null;
   }, [selectedWordId, words]);
 
+  // Dynamic controls sidebar items array with bouncy spring stagger logic
+  const sidebarItems = [
+    {
+      type: "button",
+      label: "Rules Board",
+      icon: "lucide:help-circle",
+      action: () => {
+        setIsRulesOpen(true);
+        setIsSidebarOpen(false);
+      },
+      className: "bg-[var(--snap-gray)] hover:bg-[#fffc00] hover:text-black text-[var(--foreground)]",
+    },
+    {
+      type: "button",
+      label: "Leaderboard",
+      icon: "lucide:trophy",
+      action: () => {
+        setIsLeaderboardOpen(true);
+        setIsSidebarOpen(false);
+      },
+      className: "bg-[var(--snap-gray)] hover:bg-[#fffc00] hover:text-black text-[var(--foreground)]",
+    },
+    {
+      type: "button",
+      label: "Support Dev",
+      icon: "lucide:indian-rupee",
+      action: () => {
+        setIsSupportOpen(true);
+        setIsSidebarOpen(false);
+      },
+      className: "bg-[#fffc00] text-black hover:bg-black hover:text-[#fffc00]",
+    },
+    {
+      type: "button",
+      label: isMuted ? "Unmute Sound" : "Mute Sound",
+      icon: isMuted ? "lucide:volume-x" : "lucide:volume-2",
+      action: () => {
+        setIsMuted(!isMuted);
+      },
+      className: !isMuted ? "bg-black text-[#fffc00]" : "bg-[var(--snap-gray)] text-[var(--foreground)]",
+    },
+    {
+      type: "button",
+      label: isDarkMode ? "Light Theme" : "Dark Theme",
+      icon: isDarkMode ? "lucide:sun" : "lucide:moon",
+      action: (e?: React.MouseEvent<HTMLButtonElement>) => {
+        if (e) {
+          toggleTheme(e);
+        }
+      },
+      className: "bg-[var(--snap-gray)] hover:bg-[#fffc00] hover:text-black text-[var(--foreground)]",
+    },
+    {
+      type: "divider",
+    },
+    {
+      type: "link",
+      label: "GitHub Repo",
+      icon: "lucide:github",
+      href: "https://github.com/Yashvardhan4646/Winding-Thread",
+      className: "bg-[var(--snap-gray)] hover:bg-[#fffc00] hover:text-black text-[var(--foreground)]",
+    },
+    {
+      type: "link",
+      label: "Follow on X",
+      icon: "ri:twitter-x-fill",
+      href: "https://x.com/windingthread0",
+      className: "bg-[var(--snap-gray)] hover:bg-[#fffc00] hover:text-black text-[var(--foreground)]",
+    },
+  ];
+
   return (
     <div className="relative w-screen bg-[var(--background)] text-[var(--foreground)] overflow-hidden font-sans select-none" style={{ height: "100dvh" }}>
 
@@ -805,66 +920,118 @@ export default function WindingThreadPage() {
           </div>
         </div>
 
-        {/* Right side: Leaderboard trophy + sound mute + theme toggle buttons */}
+        {/* Right side: Sidebar menu drawer toggle button */}
         <div className="pointer-events-auto flex items-center gap-2 md:gap-3">
-          {/* Trophy button (Leaderboard) */}
           <button
             onClick={() => {
               initAudio();
-              setIsLeaderboardOpen(!isLeaderboardOpen);
+              setIsSidebarOpen(!isSidebarOpen);
             }}
-            title="Country Leaderboard"
-            className={`snap-icon-btn scale-90 md:scale-100 ${isLeaderboardOpen ? "snap-icon-btn-active" : ""}`}
+            title="Open Controls Menu"
+            className={`snap-icon-btn scale-90 md:scale-100 ${isSidebarOpen ? "snap-icon-btn-active" : ""}`}
           >
-            <Icon icon="lucide:trophy" className="w-5.5 h-5.5" />
-          </button>
-
-          {/* Support Dev — big pill button */}
-          <button
-            onClick={() => {
-              initAudio();
-              setIsSupportOpen(!isSupportOpen);
-            }}
-            title="Support the Developer"
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl border-2 border-black font-black text-[11px] uppercase tracking-wider transition-all hover:scale-[1.04] active:scale-[0.96] shadow-[2px_2px_0_#000] scale-90 md:scale-100 shrink-0 ${
-              isSupportOpen
-                ? "bg-black text-[#fffc00]"
-                : "bg-[#fffc00] text-black"
-            }`}
-          >
-            <Icon icon="lucide:indian-rupee" className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Support Dev</span>
-          </button>
-
-          <button
-            onClick={() => {
-              initAudio();
-              setIsMuted(!isMuted);
-            }}
-            title={isMuted ? "Unmute Ambient Sound" : "Mute Sound"}
-            className={`snap-icon-btn scale-90 md:scale-100 ${!isMuted ? "snap-icon-btn-active" : ""}`}
-          >
-            {isMuted ? (
-              <Icon icon="lucide:volume-x" className="w-5 h-5" />
-            ) : (
-              <Icon icon="lucide:volume-2" className="w-5 h-5" />
-            )}
-          </button>
-
-          {/* Theme Toggle Button */}
-          <button
-            onClick={toggleTheme}
-            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-            className="snap-icon-btn scale-90 md:scale-100"
-          >
-            {isDarkMode ? (
-              <Icon icon="lucide:sun" className="w-5.5 h-5.5" />
-            ) : (
-              <Icon icon="lucide:moon" className="w-5 h-5" />
-            )}
+            <Icon icon={isSidebarOpen ? "lucide:x" : "lucide:menu"} className="w-5.5 h-5.5" />
           </button>
         </div>
       </header>
+
+      {/* Sidebar Controls Menu Drawer */}
+      {/* Background overlay backdrop to close sidebar on click outside */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 z-20 bg-black/40 backdrop-blur-xs transition-opacity duration-300"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sliding Sidebar Container */}
+      <div
+        className="fixed top-0 right-0 h-full w-72 bg-[var(--snap-dark)] border-l-2 border-black shadow-[-4px_0_0_#000] z-25 p-5 flex flex-col gap-6 select-none"
+        style={{
+          transform: isSidebarOpen ? "translate3d(0, 0, 0)" : "translate3d(100%, 0, 0)",
+          transition: "transform 450ms cubic-bezier(0.16, 1, 0.3, 1)",
+        }}
+      >
+        {/* Sidebar Header */}
+        <div className="flex justify-between items-center border-b border-[var(--snap-light-gray)] pb-3 mt-2">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">⚙️</span>
+            <h3 className="text-sm font-black uppercase tracking-wider text-[var(--foreground)]">
+              Controls Menu
+            </h3>
+          </div>
+          <button
+            onClick={() => setIsSidebarOpen(false)}
+            className="text-[var(--text-zinc-500)] hover:text-[var(--foreground)] cursor-pointer p-1 transition-transform hover:scale-110 active:scale-95"
+            title="Close menu"
+          >
+            <Icon icon="lucide:x" className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Sidebar Items Stack */}
+        <div className="flex-1 flex flex-col gap-3.5 overflow-y-auto snap-scrollbar pr-1">
+          {/* eslint-disable-next-line react-hooks/refs */}
+          {sidebarItems.map((item, idx) => {
+            if (item.type === "divider") {
+              return (
+                <hr
+                  key={`div-${idx}`}
+                  className="border-t border-[var(--snap-light-gray)] my-1 transition-all duration-300"
+                  style={{
+                    opacity: isSidebarOpen ? 1 : 0,
+                    transitionDelay: isSidebarOpen ? `${idx * 40}ms` : "0ms",
+                  }}
+                />
+              );
+            }
+
+            const itemStyle = {
+              opacity: isSidebarOpen ? 1 : 0,
+              transform: isSidebarOpen ? "translate3d(0, 0, 0)" : "translate3d(32px, 0, 0)",
+              transition: "transform 450ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 400ms ease-out",
+              transitionDelay: isSidebarOpen ? `${idx * 40}ms` : "0ms",
+            };
+
+            if (item.type === "link") {
+              return (
+                <a
+                  key={`link-${idx}`}
+                  href={item.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setIsSidebarOpen(false)}
+                  style={itemStyle}
+                  className={`flex items-center gap-3 w-full p-3 rounded-2xl border-2 border-black font-bold text-xs uppercase tracking-wider shadow-[2px_2px_0_#000] hover:translate-y-[-1px] hover:shadow-[3px_3px_0_#000] active:translate-y-[1px] active:shadow-[1px_1px_0_#000] transition-[background-color,color] cursor-pointer ${item.className}`}
+                >
+                  <Icon icon={item.icon || ""} className="w-5.5 h-5.5 shrink-0" />
+                  <span className="flex-1 text-left">{item.label}</span>
+                </a>
+              );
+            }
+
+            return (
+              <button
+                key={`btn-${idx}`}
+                onClick={(e) => {
+                  initAudio();
+                  item.action?.(e);
+                }}
+                style={itemStyle}
+                className={`flex items-center gap-3 w-full p-3 rounded-2xl border-2 border-black font-bold text-xs uppercase tracking-wider shadow-[2px_2px_0_#000] hover:translate-y-[-1px] hover:shadow-[3px_3px_0_#000] active:translate-y-[1px] active:shadow-[1px_1px_0_#000] transition-[background-color,color] cursor-pointer ${item.className}`}
+              >
+                <Icon icon={item.icon || ""} className="w-5.5 h-5.5 shrink-0" />
+                <span className="flex-1 text-left">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Sidebar Footer info */}
+        <div className="text-center font-mono text-[9px] text-[var(--text-zinc-500)] mt-auto pt-2 border-t border-[var(--snap-light-gray)]">
+          The Winding Thread v1.1
+        </div>
+      </div>
 
       {/* Leaderboard Modal — blurred backdrop */}
       {isLeaderboardOpen && (
@@ -920,6 +1087,64 @@ export default function WindingThreadPage() {
         </div>
       )}
 
+      {/* Rules Board Modal — blurred backdrop */}
+      {isRulesOpen && (
+        <div
+          className="absolute inset-0 z-30 flex items-center justify-center backdrop-blur-sm bg-[var(--modal-overlay)] animate-[fadeIn_0.15s_ease]"
+          onClick={() => setIsRulesOpen(false)}
+        >
+          <div
+            className="w-[92%] max-w-sm snap-card rounded-2xl p-5 border-2 border-black animate-[scaleUp_0.2s_ease]"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center border-b border-[var(--snap-light-gray)] pb-3 mb-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">📜</span>
+                <h3 className="text-sm font-black uppercase tracking-wider text-[var(--foreground)]">
+                  Rules Board
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsRulesOpen(false)}
+                className="text-[var(--text-zinc-500)] hover:text-[var(--foreground)] cursor-pointer p-1 transition-transform hover:scale-110 active:scale-95"
+              >
+                <Icon icon="lucide:x" className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs font-mono text-[var(--foreground)] snap-scrollbar max-h-72 overflow-y-auto pr-1">
+              <div className="p-3 bg-[var(--snap-gray)] border-2 border-black rounded-xl space-y-1">
+                <div className="font-extrabold text-[#ff9000] uppercase tracking-wide">1. The Chain Link</div>
+                <div className="text-[10px] leading-relaxed text-[var(--text-zinc-700)]">
+                  Every submitted word is physically connected to the previous word in the infinite 2D canvas, building a single, global continuous thread of community thoughts.
+                </div>
+              </div>
+
+              <div className="p-3 bg-[var(--snap-gray)] border-2 border-black rounded-xl space-y-1">
+                <div className="font-extrabold text-[#00c6ff] uppercase tracking-wide">2. Word Format</div>
+                <div className="text-[10px] leading-relaxed text-[var(--text-zinc-700)]">
+                  Words must be between 1 and 15 characters long. Spaces, symbols, and special characters are not allowed to preserve standard dictionary entries.
+                </div>
+              </div>
+
+              <div className="p-3 bg-[var(--snap-gray)] border-2 border-black rounded-xl space-y-1">
+                <div className="font-extrabold text-[#00e676] uppercase tracking-wide">3. Claim your Spot</div>
+                <div className="text-[10px] leading-relaxed text-[var(--text-zinc-700)]">
+                  Include an alias and your location is registered automatically to add points to your country on the Global Leaderboard.
+                </div>
+              </div>
+
+              <div className="p-3 bg-[var(--snap-gray)] border-2 border-black rounded-xl space-y-1">
+                <div className="font-extrabold text-[#e040fb] uppercase tracking-wide">4. Exploration</div>
+                <div className="text-[10px] leading-relaxed text-[var(--text-zinc-700)]">
+                  Drag the map around to travel along the thread. Scroll or pinch to zoom. Click on any speech bubble node to view details about its contributor and timestamp.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Support Dev Modal — blurred backdrop */}
       {isSupportOpen && (
         <div
@@ -963,9 +1188,8 @@ export default function WindingThreadPage() {
                   </span>
                   <button
                     onClick={handleCopyUpi}
-                    className={`border-2 border-black text-[10px] font-bold py-1.5 px-3 rounded-lg transition-all cursor-pointer shrink-0 ${
-                      copiedUpi ? "bg-green-400 text-white" : "bg-[#fffc00] hover:scale-105 active:scale-95"
-                    }`}
+                    className={`border-2 border-black text-[10px] font-bold py-1.5 px-3 rounded-lg transition-all cursor-pointer shrink-0 ${copiedUpi ? "bg-green-400 text-white" : "bg-[#fffc00] hover:scale-105 active:scale-95"
+                      }`}
                   >
                     {copiedUpi ? "✓ Copied!" : "Copy"}
                   </button>
@@ -1011,7 +1235,7 @@ export default function WindingThreadPage() {
               MESSAGE SENT
             </span>
             <p className="text-lg font-black text-[var(--foreground)] uppercase tracking-tight truncate">
-              "{selectedRecord.word}"
+              &quot;{selectedRecord.word}&quot;
             </p>
           </div>
 

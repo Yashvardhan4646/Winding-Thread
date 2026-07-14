@@ -50,7 +50,7 @@ export async function GET() {
     }
 
     return NextResponse.json(data || []);
-  } catch (error: any) {
+  } catch (error) {
     console.error("API GET Error:", error);
     return NextResponse.json({ error: "Failed to load thread data from database" }, { status: 500 });
   }
@@ -188,7 +188,7 @@ export async function POST(request: Request) {
             error: `Your word "${cleanWord}" does not make semantic sense with the previous word "${lastWord}".` 
           }, { status: 400 });
         }
-      } catch (groqError: any) {
+      } catch (groqError) {
         console.error("Failed to connect to Groq API:", groqError);
         return NextResponse.json({ error: "Unable to contact validation server." }, { status: 502 });
       }
@@ -224,8 +224,9 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true, record: insertedRecord, data: allData || [] });
-  } catch (error: any) {
+  } catch (error) {
     console.error("API POST Error:", error);
-    return NextResponse.json({ error: error.message || "Failed to add word to thread" }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : "Failed to add word to thread";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
