@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { supabase } from "../../lib/supabase";
 
+// In-memory rate limiting map (ephemeral) to avoid storing user IP address in database
+const rateLimitMap = new Map<string, number>();
+
 // Geo IP helper function to resolve country codes
 async function getCountryFromIp(ip: string, headers: Headers): Promise<string> {
   // Check standard CDN geolocation headers
@@ -42,7 +45,7 @@ export async function GET() {
   try {
     const { data, error } = await supabase
       .from("thread_words")
-      .select("*")
+      .select("id, word, author, timestamp, country")
       .order("id", { ascending: true });
 
     if (error) {
@@ -107,22 +110,21 @@ export async function POST(request: Request) {
     const isLocalIp = requestIp === "127.0.0.1" || requestIp === "::1" || requestIp.startsWith("192.168.") || requestIp.startsWith("10.");
     const ip = (isLocalIp && clientIp && clientIp !== "127.0.0.1") ? clientIp : requestIp;
 
-    // Rate-limiting check in database: limit last word submission from the same IP (wait at least 3 seconds)
-    const { data: lastIpRecord, error: rateLimitError } = await supabase
-      .from("thread_words")
-      .select("timestamp")
-      .eq("ip", ip)
-      .order("id", { ascending: false })
-      .limit(1);
-
-    if (rateLimitError) {
-      console.error("Rate limit check error:", rateLimitError);
+    // Rate-limiting check: limit last word submission from the same IP (wait at least 3 seconds)
+    // We check this in memory to avoid storing the user's IP address in the database.
+    const now = Date.now();
+    const lastSubmissionTime = rateLimitMap.get(ip);
+    if (lastSubmissionTime && now - lastSubmissionTime < 3000) {
+      return NextResponse.json({ error: "Please wait 3 seconds between submissions." }, { status: 429 });
     }
+    rateLimitMap.set(ip, now);
 
-    if (lastIpRecord && lastIpRecord.length > 0) {
-      const timeDiff = Date.now() - new Date(lastIpRecord[0].timestamp).getTime();
-      if (timeDiff < 3000) {
-        return NextResponse.json({ error: "Please wait 3 seconds between submissions." }, { status: 429 });
+    // Prune rate limit map periodically if it grows too large
+    if (rateLimitMap.size > 5000) {
+      for (const [key, value] of rateLimitMap.entries()) {
+        if (now - value > 10000) {
+          rateLimitMap.delete(key);
+        }
       }
     }
 
@@ -194,18 +196,17 @@ export async function POST(request: Request) {
       }
     }
 
-    // Insert new word record into Supabase
+    // Insert new word record into Supabase (do not store the IP address)
     const { data: insertData, error: insertError } = await supabase
       .from("thread_words")
       .insert([
         {
           word: cleanWord,
           author: cleanAuthor,
-          ip: ip,
           country: country
         }
       ])
-      .select();
+      .select("id, word, author, timestamp, country");
 
     if (insertError) {
       throw insertError;
@@ -213,10 +214,10 @@ export async function POST(request: Request) {
 
     const insertedRecord = insertData?.[0] || null;
 
-    // Fetch the updated full list of words to return
+    // Fetch the updated full list of words to return (excluding IP)
     const { data: allData, error: allDataError } = await supabase
       .from("thread_words")
-      .select("*")
+      .select("id, word, author, timestamp, country")
       .order("id", { ascending: true });
 
     if (allDataError) {

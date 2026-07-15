@@ -8,7 +8,7 @@ interface WordRecord {
   word: string;
   author: string;
   timestamp: string;
-  ip: string;
+  ip?: string;
   country?: string;
 }
 
@@ -1398,7 +1398,7 @@ export default function WindingThreadPage() {
 
         <h3>What are the word length and submission limits?</h3>
         <p>
-          Words must be 1 to 15 characters, single terms only (no spaces allowed), and contain no special symbols. To prevent spam, a database rate-limiter imposes a 3-second cooldown per IP address between submissions.
+          Words must be 1 to 15 characters, single terms only (no spaces allowed), and contain no special symbols. To prevent spam, an ephemeral in-memory rate-limiter imposes a 3-second cooldown per IP address between submissions, without storing the IP address.
         </p>
 
         <h3>How does the country leaderboard work?</h3>
